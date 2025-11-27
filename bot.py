@@ -584,7 +584,7 @@ class TwitterBot:
             generators = {
                 "resumen_mensual": ("/vuelos/kpis", self.content_generator.generar_resumen_mensual, {"months": months_filter, "all_periods": False}),
                 "top_aerolineas": ("/vuelos/aerolinea", self.content_generator.generar_top_aerolineas, {"months": months_filter, "all_periods": False, "limit": 10}),
-                "rutas_transitadas": ("/vuelos/rutas-enriquecidas", self.content_generator.generar_rutas_transitadas, {"months": months_filter, "all_periods": False, "limit": 25}),
+                "rutas_transitadas": ("/vuelos/rutas", self.content_generator.generar_rutas_transitadas, {"months": months_filter, "all_periods": False, "limit": 25}),
                 "destinos_internacionales": ("/vuelos/paises", self.content_generator.generar_destinos_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino"}),
                 "ocupacion_promedio": ("/vuelos/ocupacion", self.content_generator.generar_ocupacion_promedio, {"months": months_filter, "all_periods": False}),
                 "evolucion_historica": ("/vuelos/mes", self.content_generator.generar_evolucion_historica, {}),
