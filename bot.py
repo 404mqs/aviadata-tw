@@ -41,7 +41,16 @@ class TwitterBotConfig:
     API_BASE_URL = os.getenv("AVIADATA_API_URL")
     
     # Base de datos de logs
-    DATA_DIR = os.getenv("DATA_DIR", ".")
+    # Auto-detectar Railway: usar volumen /data si existe, sino directorio actual
+    DATA_DIR = os.getenv("DATA_DIR")
+    if DATA_DIR is None:
+        # Si estamos en Railway con volumen montado en /data
+        if os.path.exists("/data") and os.path.isdir("/data"):
+            DATA_DIR = "/data"
+            logger.info("🚂 Railway volume detectado: usando /data para persistencia")
+        else:
+            DATA_DIR = "."
+    
     LOG_DB_PATH = os.path.join(DATA_DIR, "twitter_bot_logs.db")
     
     # Configuración del cronograma (días del mes)

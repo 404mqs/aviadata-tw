@@ -177,6 +177,44 @@ docker run -d --name bot \
   aviadata-twitter-bot
 ```
 
+#### En Railway (Recomendado para producción):
+
+**Setup inicial:**
+
+1. **Crear proyecto en Railway**:
+   - Ve a [railway.app](https://railway.app)
+   - Create New Project → Deploy from GitHub repo
+   - Selecciona tu repo `aviadata-tw`
+
+2. **Agregar volumen persistente**:
+   - En tu servicio → Settings → Volumes
+   - Click "New Volume"
+   - Mount path: `/data`
+   - Esto permite que la base de datos SQLite persista entre redeploys
+
+3. **Configurar variables de entorno**:
+   - En Variables, agregar:
+     ```
+     TWITTER_API_KEY=tu_key
+     TWITTER_API_SECRET=tu_secret
+     TWITTER_ACCESS_TOKEN=tu_token
+     TWITTER_ACCESS_SECRET=tu_access_secret
+     TWITTER_BEARER_TOKEN=tu_bearer
+     AVIADATA_API_URL=https://aviadata-backend-production-8fa2.up.railway.app
+     ```
+
+4. **Deploy**:
+   - Railway auto-detecta Python y ejecuta `bot.py`
+   - El bot usará automáticamente `/data` para la DB SQLite
+   - Cada redeploy mantiene el estado (tweets enviados, mes actual, etc.)
+
+**Ventajas de Railway:**
+- ✅ Persistencia automática con volumen `/data`
+- ✅ No se pierde el cronograma en redeploys
+- ✅ Logs centralizados en Railway dashboard
+- ✅ Auto-restart si el bot crashea
+- ✅ Deploy automático en cada push a GitHub
+
 ## 📊 Monitoring y Logs
 
 ### Ver logs en tiempo real
