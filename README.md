@@ -207,6 +207,11 @@ docker run -d --name bot \
    - Railway auto-detecta Python y ejecuta `bot.py`
    - El bot usará automáticamente `/data` para la DB SQLite
    - Cada redeploy mantiene el estado (tweets enviados, mes actual, etc.)
+   - Endpoints disponibles:
+     - `GET /status` → Próximo tweet pendiente y listado de pendientes
+     - `POST /force-next` → Fuerza el próximo tweet pendiente
+     - `POST /force` con JSON `{ "dia": 2, "mes": "2025-11" }` → Fuerza uno específico
+   - Si Railway requiere puerto explícito, agrega `PORT=8000` en Variables
 
 **Ventajas de Railway:**
 - ✅ Persistencia automática con volumen `/data`
@@ -214,6 +219,7 @@ docker run -d --name bot \
 - ✅ Logs centralizados en Railway dashboard
 - ✅ Auto-restart si el bot crashea
 - ✅ Deploy automático en cada push a GitHub
+ - ✅ Control vía endpoints sin acceder al volumen
 
 ## 📊 Monitoring y Logs
 

@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, List
 from apscheduler.schedulers.background import BackgroundScheduler
 import tweepy
 from dotenv import load_dotenv
+from flask import Flask, jsonify, request
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -429,6 +430,7 @@ class TwitterBot:
         self.content_generator = TwitterContentGenerator()
         self.scheduler = BackgroundScheduler()
         self.twitter_api = self._setup_twitter_api()
+        self.app = None
         
         logger.info("🤖 Bot de Twitter inicializado")
     
@@ -691,6 +693,69 @@ class TwitterBot:
         except Exception as e:
             logger.error(f"Error deteniendo scheduler: {e}")
 
+    # ================================
+    # HTTP SERVER (STATUS + FORCE NEXT)
+    # ================================
+    def get_next_pending_post(self):
+        try:
+            mes_actual = self.logger.get_bot_state("current_publishing_month")
+            if not mes_actual:
+                return {"mes": None, "next": None, "pending": [], "message": "No hay mes de publicación activo"}
+
+            dia_actual = datetime.now().day
+            pending = []
+            for dia_cronograma, post_config in sorted(self.config.CRONOGRAMA_POSTS.items()):
+                if dia_cronograma <= dia_actual:
+                    tipo_post = post_config["tipo"]
+                    exists = self.logger.check_post_exists(tipo_post, mes_actual, dia_cronograma)
+                    if not exists:
+                        pending.append({"dia": dia_cronograma, "tipo": tipo_post})
+
+            next_post = pending[0] if pending else None
+            return {"mes": mes_actual, "next": next_post, "pending": pending}
+        except Exception as e:
+            logger.error(f"Error calculando próximo post: {e}")
+            return {"error": str(e)}
+
+    def start_http_server(self):
+        try:
+            app = Flask(__name__)
+
+            @app.get("/status")
+            def status():
+                info = self.get_next_pending_post()
+                return jsonify(info)
+
+            @app.post("/force-next")
+            def force_next():
+                info = self.get_next_pending_post()
+                if not info.get("next") or not info.get("mes"):
+                    return jsonify({"ok": False, "message": "No hay próximo post pendiente"}), 400
+                dia = info["next"]["dia"]
+                mes = info["mes"]
+                ok = self.execute_scheduled_post(dia, mes)
+                return jsonify({"ok": bool(ok), "dia": dia, "mes": mes})
+
+            # opcional: forzar por parámetros
+            @app.post("/force")
+            def force():
+                body = request.get_json(force=True) if request.data else {}
+                dia = int(body.get("dia"))
+                mes = body.get("mes")
+                if dia is None or mes is None:
+                    return jsonify({"ok": False, "message": "Faltan parámetros dia y mes"}), 400
+                ok = self.execute_scheduled_post(dia, mes)
+                return jsonify({"ok": bool(ok), "dia": dia, "mes": mes})
+
+            self.app = app
+
+            port = int(os.getenv("PORT", "8000"))
+            thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True)
+            thread.start()
+            logger.info(f"🌐 HTTP server iniciado en puerto {port} (/status, /force-next, /force)")
+        except Exception as e:
+            logger.error(f"Error iniciando HTTP server: {e}")
+
 # ================================
 # FUNCIÓN PRINCIPAL
 # ================================
@@ -717,6 +782,8 @@ def main():
     try:
         # Iniciar scheduler
         bot.start_scheduler()
+        # Iniciar HTTP server para status/acciones
+        bot.start_http_server()
         
         logger.info("✅ Bot iniciado exitosamente. Presiona Ctrl+C para detener.")
         
