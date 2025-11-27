@@ -481,6 +481,37 @@ aviadata.ar
         tweet += f"\naviadata.ar\n#Rutas #{mes_formateado.replace(' ', '')}"
         return tweet[:280]
 
+    @staticmethod
+    def generar_aeropuertos_activos(data: list, mes: str) -> Optional[str]:
+        """Generar tweet de aeropuertos más activos usando /vuelos/aeropuerto"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not data or len(data) == 0:
+            return None
+
+        # Formato: { "Aeropuerto": "SABE", "Cantidad": 11314 }
+        try:
+            logger.info(f"🔎 Muestra API aeropuerto: {json.dumps(data[:3])}")
+        except Exception:
+            pass
+
+        parsed = []
+        for item in data:
+            code = item.get("Aeropuerto") or item.get("Codigo") or item.get("code")
+            count = item.get("Cantidad") or item.get("total_vuelos") or item.get("vuelos") or 0
+            if code and isinstance(count, (int, float)) and count > 0:
+                parsed.append((str(code), int(count)))
+
+        if not parsed:
+            return None
+
+        top = sorted(parsed, key=lambda x: x[1], reverse=True)[:3]
+        tweet = f"🛫 Aeropuertos más activos {mes_formateado}\n\n"
+        medals = ["🥇", "🥈", "🥉"]
+        for i, (code, cnt) in enumerate(top):
+            tweet += f"{medals[i]} {code}: {cnt:,} vuelos\n"
+        tweet += f"\naviadata.ar\n#Aeropuertos #{mes_formateado.replace(' ', '')}"
+        return tweet[:280]
+
 # ================================
 # BOT DE TWITTER PRINCIPAL
 # ================================
@@ -589,6 +620,7 @@ class TwitterBot:
                 "resumen_mensual": ("/vuelos/kpis", self.content_generator.generar_resumen_mensual, {"months": months_filter, "all_periods": False}),
                 "top_aerolineas": ("/vuelos/aerolinea", self.content_generator.generar_top_aerolineas, {"months": months_filter, "all_periods": False, "limit": 10}),
                 "rutas_transitadas": ("/vuelos/rutas", self.content_generator.generar_rutas_transitadas, {"months": months_filter, "all_periods": False, "limit": 25}),
+                "aeropuertos_activos": ("/vuelos/aeropuerto", self.content_generator.generar_aeropuertos_activos, {"months": months_filter, "all_periods": False, "limit": 25}),
                 "destinos_internacionales": ("/vuelos/paises", self.content_generator.generar_destinos_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino"}),
                 "ocupacion_promedio": ("/vuelos/ocupacion", self.content_generator.generar_ocupacion_promedio, {"months": months_filter, "all_periods": False}),
                 "evolucion_historica": ("/vuelos/mes", self.content_generator.generar_evolucion_historica, {}),
