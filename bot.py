@@ -839,6 +839,53 @@ class TwitterBot:
                     logger.error(f"Error en /preview: {e}")
                     return jsonify({"ok": False, "message": str(e)}), 500
 
+            # Preview de todos los días del cronograma para el mes actual
+            @app.get("/preview-all")
+            def preview_all():
+                try:
+                    mes_actual = self.logger.get_bot_state("current_publishing_month")
+                    if not mes_actual:
+                        self.verificar_nuevo_mes()
+                        mes_actual = self.logger.get_bot_state("current_publishing_month")
+                        if not mes_actual:
+                            return jsonify({"ok": False, "message": "No hay mes actual de publicación"}), 400
+
+                    resultados = []
+                    for dia, cfg in sorted(self.config.CRONOGRAMA_POSTS.items()):
+                        tipo = cfg["tipo"]
+                        try:
+                            texto = self.generate_content_for_post_type(tipo, mes_actual)
+                            if texto:
+                                resultados.append({
+                                    "dia": dia,
+                                    "tipo": tipo,
+                                    "ok": True,
+                                    "texto": texto
+                                })
+                            else:
+                                resultados.append({
+                                    "dia": dia,
+                                    "tipo": tipo,
+                                    "ok": False,
+                                    "error": "No se pudo generar contenido"
+                                })
+                        except Exception as e:
+                            resultados.append({
+                                "dia": dia,
+                                "tipo": tipo,
+                                "ok": False,
+                                "error": str(e)
+                            })
+
+                    return jsonify({
+                        "ok": True,
+                        "mes": mes_actual,
+                        "resultados": resultados
+                    })
+                except Exception as e:
+                    logger.error(f"Error en /preview-all: {e}")
+                    return jsonify({"ok": False, "message": str(e)}), 500
+
             self.app = app
 
             port = int(os.getenv("PORT", "8000"))
