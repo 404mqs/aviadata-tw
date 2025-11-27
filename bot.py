@@ -457,14 +457,18 @@ aviadata.ar
         except Exception:
             pass
         
-        # Esperamos campos como Origen, Destino y total_vuelos/Cantidad
+        # Formato actual: { "Ruta": "SABE-SACO", "Cantidad": 34970 }
         rutas = []
         for item in data:
-            origen = item.get("Aeropuerto Origen Codigo") or item.get("origen") or item.get("Origen")
-            destino = item.get("Aeropuerto Destino Codigo") or item.get("destino") or item.get("Destino")
-            vuelos = item.get("total_vuelos") or item.get("Cantidad") or item.get("vuelos") or 0
-            if origen and destino and isinstance(vuelos, (int, float)) and vuelos > 0:
-                rutas.append((str(origen), str(destino), int(vuelos)))
+            ruta = item.get("Ruta") or item.get("ruta")
+            vuelos = item.get("Cantidad") or item.get("total_vuelos") or item.get("vuelos") or 0
+            if ruta and isinstance(vuelos, (int, float)) and vuelos > 0:
+                try:
+                    origen, destino = str(ruta).split("-")
+                except ValueError:
+                    # Si no se puede dividir, usar la ruta completa como etiqueta
+                    origen, destino = str(ruta), ""
+                rutas.append((origen, destino, int(vuelos)))
         
         if not rutas:
             return None
