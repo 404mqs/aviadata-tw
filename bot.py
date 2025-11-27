@@ -58,7 +58,7 @@ class TwitterBotConfig:
     CRONOGRAMA_POSTS = {
         0: {"tipo": "resumen_mensual", "endpoint": "/vuelos/kpis", "descripcion": "Resumen mensual del mes nuevo"},
         2: {"tipo": "top_aerolineas", "endpoint": "/vuelos/aerolinea", "descripcion": "Top aerolíneas"},
-        4: {"tipo": "rutas_transitadas", "endpoint": "/vuelos/rutas-enriquecidas", "descripcion": "Rutas más transitadas"},
+        4: {"tipo": "rutas_transitadas", "endpoint": "/vuelos/rutas", "descripcion": "Rutas más transitadas"},
         6: {"tipo": "aeropuertos_activos", "endpoint": "/vuelos/aeropuerto", "descripcion": "Aeropuertos más activos"},
         8: {"tipo": "destinos_internacionales", "endpoint": "/vuelos/paises", "descripcion": "Destinos internacionales"},
         10: {"tipo": "evolucion_historica", "endpoint": "/vuelos/mes", "descripcion": "Evolución histórica"},
