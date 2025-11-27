@@ -849,7 +849,7 @@ class TwitterBot:
                 "records_curiosidades": (None, None, {}),
                 "aerolineas_inusuales": (None, None, {}),
                 "comparativa_mensual": (None, None, {}),
-                "rutas_internacionales": ("/vuelos/paises", self.content_generator.generar_rutas_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino"}),
+                "rutas_internacionales": ("/vuelos/paises", self.content_generator.generar_rutas_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino", "flight_types": "Internacional"}),
                 "promedios_clase": ("/vuelos/clase", self.content_generator.generar_promedios_clase, {"months": months_filter, "all_periods": False}),
                 "recap_grafico": (None, None, {}),
             }
