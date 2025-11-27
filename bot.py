@@ -798,6 +798,43 @@ class TwitterBot:
                 ok = self.execute_scheduled_post(dia, mes)
                 return jsonify({"ok": bool(ok), "dia": dia, "mes": mes})
 
+            # Preview de texto para un día del cronograma en el mes actual
+            @app.get("/preview")
+            def preview():
+                try:
+                    dia_param = request.args.get("dia")
+                    if dia_param is None:
+                        return jsonify({"ok": False, "message": "Falta parámetro 'dia'"}), 400
+                    dia = int(dia_param)
+
+                    mes_actual = self.logger.get_bot_state("current_publishing_month")
+                    if not mes_actual:
+                        # Intentar detectar nuevo mes
+                        self.verificar_nuevo_mes()
+                        mes_actual = self.logger.get_bot_state("current_publishing_month")
+                        if not mes_actual:
+                            return jsonify({"ok": False, "message": "No hay mes actual de publicación"}), 400
+
+                    post_config = self.config.CRONOGRAMA_POSTS.get(dia)
+                    if not post_config:
+                        return jsonify({"ok": False, "message": f"Día {dia} no existe en cronograma"}), 404
+
+                    tipo_post = post_config["tipo"]
+                    texto = self.generate_content_for_post_type(tipo_post, mes_actual)
+                    if not texto:
+                        return jsonify({"ok": False, "message": "No se pudo generar contenido"}), 500
+
+                    return jsonify({
+                        "ok": True,
+                        "dia": dia,
+                        "mes": mes_actual,
+                        "tipo": tipo_post,
+                        "texto": texto
+                    })
+                except Exception as e:
+                    logger.error(f"Error en /preview: {e}")
+                    return jsonify({"ok": False, "message": str(e)}), 500
+
             self.app = app
 
             port = int(os.getenv("PORT", "8000"))
