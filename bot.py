@@ -580,38 +580,23 @@ class TwitterBot:
         try:
             months_filter = [mes]  # Filtrar por el mes específico
             
-            if tipo_post == "resumen_mensual":
-                data = self.api_client.make_request("/vuelos/kpis", 
-                                                  {"months": months_filter, "all_periods": False})
-                return self.content_generator.generar_resumen_mensual(data, mes)
-            
-            elif tipo_post == "top_aerolineas":
-                data = self.api_client.make_request("/vuelos/aerolinea", 
-                                                  {"months": months_filter, "all_periods": False, "limit": 10})
-                return self.content_generator.generar_top_aerolineas(data, mes)
-            
-            elif tipo_post == "rutas_transitadas":
-                data = self.api_client.make_request("/vuelos/rutas-enriquecidas", 
-                                                  {"months": months_filter, "all_periods": False, "limit": 25})
-                return self.content_generator.generar_rutas_transitadas(data, mes)
-            
-            elif tipo_post == "destinos_internacionales":
-                data = self.api_client.make_request("/vuelos/paises", 
-                                                  {"months": months_filter, "all_periods": False, "tipo_pais": "destino"})
-                return self.content_generator.generar_destinos_internacionales(data, mes)
-            
-            elif tipo_post == "ocupacion_promedio":
-                data = self.api_client.make_request("/vuelos/ocupacion",
-                                                  {"months": months_filter, "all_periods": False})
-                return self.content_generator.generar_ocupacion_promedio(data, mes)
-            
-            elif tipo_post == "evolucion_historica":
-                data = self.api_client.make_request("/vuelos/mes")
-                return self.content_generator.generar_evolucion_historica(data, mes)
-            
-            else:
+            # Mapa centralizado de endpoints y generadores
+            generators = {
+                "resumen_mensual": ("/vuelos/kpis", self.content_generator.generar_resumen_mensual, {"months": months_filter, "all_periods": False}),
+                "top_aerolineas": ("/vuelos/aerolinea", self.content_generator.generar_top_aerolineas, {"months": months_filter, "all_periods": False, "limit": 10}),
+                "rutas_transitadas": ("/vuelos/rutas-enriquecidas", self.content_generator.generar_rutas_transitadas, {"months": months_filter, "all_periods": False, "limit": 25}),
+                "destinos_internacionales": ("/vuelos/paises", self.content_generator.generar_destinos_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino"}),
+                "ocupacion_promedio": ("/vuelos/ocupacion", self.content_generator.generar_ocupacion_promedio, {"months": months_filter, "all_periods": False}),
+                "evolucion_historica": ("/vuelos/mes", self.content_generator.generar_evolucion_historica, {}),
+            }
+
+            if tipo_post not in generators:
                 logger.warning(f"⚠️ Tipo de post no implementado: {tipo_post}")
                 return None
+
+            endpoint, generator_fn, params = generators[tipo_post]
+            data = self.api_client.make_request(endpoint, params if params else None)
+            return generator_fn(data, mes)
                 
         except Exception as e:
             logger.error(f"Error generando contenido para {tipo_post}: {e}")
