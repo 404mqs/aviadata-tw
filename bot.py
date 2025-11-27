@@ -886,6 +886,59 @@ class TwitterBot:
                     logger.error(f"Error en /preview-all: {e}")
                     return jsonify({"ok": False, "message": str(e)}), 500
 
+            # Debug: obtener JSON crudo de un endpoint permitido
+            @app.get("/debug")
+            def debug():
+                try:
+                    endpoint = request.args.get("endpoint")
+                    mes = request.args.get("mes")
+                    if not endpoint:
+                        return jsonify({"ok": False, "message": "Falta parámetro 'endpoint'"}), 400
+
+                    # Lista blanca de endpoints
+                    allowed = [
+                        "/vuelos/aerolinea",
+                        "/vuelos/pasajeros",
+                        "/vuelos/ocupacion",
+                        "/vuelos/mes",
+                        "/vuelos/clase",
+                        "/vuelos/aeropuerto",
+                        "/vuelos/rutas",
+                        "/vuelos/diario",
+                        "/pasajeros/diario",
+                        "/vuelos/kpis",
+                        "/aerolineas/lista",
+                        "/vuelos/tipos",
+                        "/vuelos/clases",
+                        "/vuelos/provincias",
+                        "/vuelos/paises",
+                        "/vuelos/rutas-enriquecidas",
+                        "/vuelos/detallados",
+                        "/aeropuertos/evolucion-mensual",
+                        "/aeropuertos/lista",
+                        "/aeropuertos/rango-meses",
+                        "/aeropuertos/aerolineas-cambios",
+                        "/vuelos/mapa-rutas",
+                        "/aeropuertos/mapa",
+                        "/vuelos/mapa/rutas-optimizadas",
+                        "/vuelos/mapa/aeropuertos",
+                        "/vuelos/mapa/red-aerolinea/{aerolinea}",
+                        "/vuelos/mapa/heatmap-trafico",
+                    ]
+
+                    if endpoint not in allowed:
+                        return jsonify({"ok": False, "message": "Endpoint no permitido"}), 400
+
+                    # Params
+                    mes_actual = self.logger.get_bot_state("current_publishing_month")
+                    months_filter = [mes or mes_actual] if (mes or mes_actual) else None
+                    params = {"months": months_filter, "all_periods": False} if months_filter else {}
+                    data = self.api_client.make_request(endpoint, params if params else None)
+                    return jsonify({"ok": True, "endpoint": endpoint, "params": params, "data": data})
+                except Exception as e:
+                    logger.error(f"Error en /debug: {e}")
+                    return jsonify({"ok": False, "message": str(e)}), 500
+
             self.app = app
 
             port = int(os.getenv("PORT", "8000"))
