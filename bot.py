@@ -512,6 +512,226 @@ aviadata.ar
         tweet += f"\naviadata.ar\n#Aeropuertos #{mes_formateado.replace(' ', '')}"
         return tweet[:280]
 
+    @staticmethod
+    def _get_prev_month(mes: str) -> Optional[str]:
+        try:
+            dt = datetime.strptime(mes + "-01", "%Y-%m-%d")
+            prev = dt - timedelta(days=1)
+            return prev.strftime("%Y-%m")
+        except Exception:
+            return None
+
+    @staticmethod
+    def generar_comparativa_aeropuertos(actual: list, anterior: list, mes: str) -> Optional[str]:
+        """Comparar actividad de aeropuertos vs mes anterior usando /vuelos/aeropuerto"""
+        mes_act = TwitterContentGenerator.format_month_name(mes)
+        prev_mes = TwitterContentGenerator._get_prev_month(mes)
+        if not actual or not anterior or not prev_mes:
+            return None
+
+        map_act = {str(x.get("Aeropuerto") or x.get("Codigo") or ""): int(x.get("Cantidad") or 0) for x in actual}
+        map_prev = {str(x.get("Aeropuerto") or x.get("Codigo") or ""): int(x.get("Cantidad") or 0) for x in anterior}
+
+        # Calcular variación para aeropuertos presentes en actual
+        comps = []
+        for code, cnt in map_act.items():
+            prev = map_prev.get(code, 0)
+            if prev > 0:
+                change = ((cnt - prev) / prev) * 100.0
+                comps.append((code, cnt, change))
+        if not comps:
+            return None
+
+        top = sorted(comps, key=lambda x: x[2], reverse=True)[:3]
+        tweet = f"🏟️ Aeropuertos: variación vs {TwitterContentGenerator.format_month_name(prev_mes)}\n{mes_act}\n\n"
+        for code, cnt, ch in top:
+            sign = "⬆️" if ch >= 0 else "⬇️"
+            tweet += f"{sign} {code}: {cnt:,} vuelos ({ch:.1f}%)\n"
+        tweet += f"\naviadata.ar\n#Comparativa #{mes_act.replace(' ', '')}"
+        return tweet[:280]
+
+    @staticmethod
+    def generar_records_curiosidades(vuelos_diario: list, pax_diario: list, mes: str) -> Optional[str]:
+        """Encontrar récord diario de vuelos y pasajeros"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not vuelos_diario and not pax_diario:
+            return None
+
+        def best_day(items, key_name):
+            if not items:
+                return None
+            try:
+                top = max(items, key=lambda x: int(x.get(key_name) or 0))
+                fecha = top.get("Fecha") or top.get("fecha") or ""
+                valor = int(top.get(key_name) or 0)
+                return fecha, valor
+            except Exception:
+                return None
+
+        vuelos_top = best_day(vuelos_diario, "Cantidad")
+        pax_top = best_day(pax_diario, "Cantidad")
+
+        if not vuelos_top and not pax_top:
+            return None
+
+        tweet = f"🧠 Récords y curiosidades {mes_formateado}\n\n"
+        if vuelos_top:
+            fecha, v = vuelos_top
+            tweet += f"✈️ Día con más vuelos: {fecha} ({v:,})\n"
+        if pax_top:
+            fecha, p = pax_top
+            tweet += f"👥 Día con más pasajeros: {fecha} ({p:,})\n"
+        tweet += "\naviadata.ar\n#Curiosidades #Records"
+        return tweet[:280]
+
+    @staticmethod
+    def generar_aerolineas_inusuales(aerolineas_mes: list, mes: str) -> Optional[str]:
+        """Detectar aerolíneas con participación muy baja como 'inusuales'"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not aerolineas_mes:
+            return None
+
+        total = sum(int(x.get("Cantidad") or x.get("total_vuelos") or 0) for x in aerolineas_mes)
+        if total <= 0:
+            return None
+
+        parts = []
+        for x in aerolineas_mes:
+            nombre = x.get("Aerolinea Nombre") or x.get("nombre") or x.get("Aerolinea") or "Desconocida"
+            cnt = int(x.get("Cantidad") or x.get("total_vuelos") or 0)
+            share = (cnt / total) * 100.0
+            parts.append((str(nombre)[:20], cnt, share))
+
+        # Ordenar por menor participación y tomar 3 con >0
+        candidates = [p for p in parts if p[1] > 0]
+        if not candidates:
+            return None
+        top = sorted(candidates, key=lambda x: x[2])[:3]
+
+        tweet = f"🧐 Aerolíneas inusuales {mes_formateado}\n(Participación muy baja)\n\n"
+        for nombre, cnt, share in top:
+            tweet += f"• {nombre}: {cnt:,} vuelos ({share:.2f}%)\n"
+        tweet += f"\naviadata.ar\n#Aerolíneas #Inusual"
+        return tweet[:280]
+
+    @staticmethod
+    def generar_comparativa_mensual(kpis_actual: dict, kpis_anterior: dict, mes: str) -> Optional[str]:
+        """Comparar KPIs vs mes anterior usando /vuelos/kpis"""
+        mes_act = TwitterContentGenerator.format_month_name(mes)
+        prev_mes = TwitterContentGenerator._get_prev_month(mes)
+        if not kpis_actual or not kpis_anterior or not prev_mes:
+            return None
+
+        def fmt_change(a, b):
+            try:
+                return ((a - b) / b) * 100.0 if b else 0.0
+            except Exception:
+                return 0.0
+
+        v_act = kpis_actual.get("total_vuelos", 0)
+        v_prev = kpis_anterior.get("total_vuelos", 0)
+        p_act = kpis_actual.get("total_pasajeros", 0)
+        p_prev = kpis_anterior.get("total_pasajeros", 0)
+        o_act = kpis_actual.get("ocupacion_promedio", 0.0)
+        o_prev = kpis_anterior.get("ocupacion_promedio", 0.0)
+
+        tweet = f"🔄 Comparativa mensual ({mes_act} vs {TwitterContentGenerator.format_month_name(prev_mes)})\n\n"
+        tweet += f"✈️ Vuelos: {v_act:,} ({fmt_change(v_act, v_prev):.1f}%)\n"
+        tweet += f"👥 Pasajeros: {p_act:,} ({fmt_change(p_act, p_prev):.1f}%)\n"
+        tweet += f"📊 Ocupación: {o_act:.1f}% ({fmt_change(o_act, o_prev):.1f}%)\n"
+        tweet += "\naviadata.ar\n#Comparativa #Mensual"
+        return tweet[:280]
+
+    @staticmethod
+    def generar_rutas_internacionales(data: list, mes: str) -> Optional[str]:
+        """Top destinos internacionales por país usando /vuelos/paises"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not data:
+            return None
+        try:
+            logger.info(f"🔎 Muestra API paises: {json.dumps(data[:3])}")
+        except Exception:
+            pass
+
+        # Intentar campos comunes
+        parsed = []
+        for x in data:
+            nombre = x.get("Pais Destino Nombre") or x.get("Pais Nombre") or x.get("pais") or "Desconocido"
+            cnt = x.get("total_vuelos") or x.get("Cantidad") or 0
+            if isinstance(cnt, (int, float)) and cnt > 0:
+                parsed.append((str(nombre)[:18], int(cnt)))
+        if not parsed:
+            return None
+
+        top = sorted(parsed, key=lambda x: x[1], reverse=True)[:3]
+        tweet = f"🌍 Destinos internacionales {mes_formateado}\n\n"
+        medals = ["🥇", "🥈", "🥉"]
+        for i, (n, c) in enumerate(top):
+            tweet += f"{medals[i]} {n}: {c:,} vuelos\n"
+        tweet += f"\naviadata.ar\n#Internacionales #{mes_formateado.replace(' ', '')}"
+        return tweet[:280]
+
+    @staticmethod
+    def generar_promedios_clase(data: list, mes: str) -> Optional[str]:
+        """Promedios por clase usando /vuelos/clase"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not data:
+            return None
+        try:
+            logger.info(f"🔎 Muestra API clase: {json.dumps(data[:3])}")
+        except Exception:
+            pass
+
+        parsed = []
+        for x in data:
+            nombre = x.get("Clase Nombre") or x.get("clase") or x.get("Clase") or "Desconocida"
+            cnt = x.get("Cantidad") or x.get("total_vuelos") or 0
+            if isinstance(cnt, (int, float)) and cnt > 0:
+                parsed.append((str(nombre)[:18], int(cnt)))
+        if not parsed:
+            return None
+
+        top = sorted(parsed, key=lambda x: x[1], reverse=True)[:3]
+        tweet = f"🧭 Clases más usadas {mes_formateado}\n\n"
+        medals = ["🥇", "🥈", "🥉"]
+        for i, (n, c) in enumerate(top):
+            tweet += f"{medals[i]} {n}: {c:,} vuelos\n"
+        tweet += f"\naviadata.ar\n#Clases #{mes_formateado.replace(' ', '')}"
+        return tweet[:280]
+
+    @staticmethod
+    def generar_recap_grafico(kpis: dict, aerolineas: list, aeropuertos: list, mes: str) -> Optional[str]:
+        """Recap textual del mes: KPIs + top categorías"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not kpis:
+            return None
+
+        v = kpis.get("total_vuelos", 0)
+        p = kpis.get("total_pasajeros", 0)
+        o = kpis.get("ocupacion_promedio", 0.0)
+
+        def top_names(items, key_name):
+            if not items:
+                return []
+            parsed = []
+            for x in items:
+                nombre = x.get(key_name) or x.get("nombre") or "-"
+                cnt = x.get("Cantidad") or x.get("total_vuelos") or 0
+                if isinstance(cnt, (int, float)) and cnt > 0:
+                    parsed.append((str(nombre)[:18], int(cnt)))
+            return [n for n, _ in sorted(parsed, key=lambda y: y[1], reverse=True)[:3]]
+
+        top_aero = top_names(aerolineas, "Aerolinea Nombre")
+        top_airp = top_names(aeropuertos, "Aeropuerto")
+
+        tweet = f"🧾 Recap {mes_formateado}\n✈️ {v:,} vuelos | 👥 {p:,} pax | 📊 {o:.1f}% ocupación\n"
+        if top_aero:
+            tweet += f"🏆 Aerolíneas top: {', '.join(top_aero)}\n"
+        if top_airp:
+            tweet += f"🛫 Aeropuertos top: {', '.join(top_airp)}\n"
+        tweet += "\naviadata.ar\n#Resumen #Aviación"
+        return tweet[:280]
+
 # ================================
 # BOT DE TWITTER PRINCIPAL
 # ================================
@@ -624,6 +844,14 @@ class TwitterBot:
                 "destinos_internacionales": ("/vuelos/paises", self.content_generator.generar_destinos_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino"}),
                 "ocupacion_promedio": ("/vuelos/ocupacion", self.content_generator.generar_ocupacion_promedio, {"months": months_filter, "all_periods": False}),
                 "evolucion_historica": ("/vuelos/mes", self.content_generator.generar_evolucion_historica, {}),
+                # comp. aeropuertos: necesitamos datos de mes actual y anterior
+                "comparativa_aeropuertos": (None, None, {}),
+                "records_curiosidades": (None, None, {}),
+                "aerolineas_inusuales": (None, None, {}),
+                "comparativa_mensual": (None, None, {}),
+                "rutas_internacionales": ("/vuelos/paises", self.content_generator.generar_rutas_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino"}),
+                "promedios_clase": ("/vuelos/clase", self.content_generator.generar_promedios_clase, {"months": months_filter, "all_periods": False}),
+                "recap_grafico": (None, None, {}),
             }
 
             if tipo_post not in generators:
@@ -631,6 +859,40 @@ class TwitterBot:
                 return None
 
             endpoint, generator_fn, params = generators[tipo_post]
+
+            # Manejo especial para tipos que requieren múltiples endpoints
+            if tipo_post == "comparativa_aeropuertos":
+                prev_mes = self.content_generator._get_prev_month(mes)
+                if not prev_mes:
+                    return None
+                actual = self.api_client.make_request("/vuelos/aeropuerto", {"months": [mes], "all_periods": False})
+                anterior = self.api_client.make_request("/vuelos/aeropuerto", {"months": [prev_mes], "all_periods": False})
+                return self.content_generator.generar_comparativa_aeropuertos(actual or [], anterior or [], mes)
+
+            if tipo_post == "records_curiosidades":
+                vuelos = self.api_client.make_request("/vuelos/diario", {"months": [mes], "all_periods": False})
+                pax = self.api_client.make_request("/pasajeros/diario", {"months": [mes], "all_periods": False})
+                return self.content_generator.generar_records_curiosidades(vuelos or [], pax or [], mes)
+
+            if tipo_post == "aerolineas_inusuales":
+                data = self.api_client.make_request("/vuelos/aerolinea", {"months": [mes], "all_periods": False})
+                return self.content_generator.generar_aerolineas_inusuales(data or [], mes)
+
+            if tipo_post == "comparativa_mensual":
+                prev_mes = self.content_generator._get_prev_month(mes)
+                if not prev_mes:
+                    return None
+                act = self.api_client.make_request("/vuelos/kpis", {"months": [mes], "all_periods": False})
+                prev = self.api_client.make_request("/vuelos/kpis", {"months": [prev_mes], "all_periods": False})
+                return self.content_generator.generar_comparativa_mensual(act or {}, prev or {}, mes)
+
+            if tipo_post == "recap_grafico":
+                kpis = self.api_client.make_request("/vuelos/kpis", {"months": [mes], "all_periods": False})
+                aeros = self.api_client.make_request("/vuelos/aerolinea", {"months": [mes], "all_periods": False, "limit": 10})
+                airp = self.api_client.make_request("/vuelos/aeropuerto", {"months": [mes], "all_periods": False, "limit": 10})
+                return self.content_generator.generar_recap_grafico(kpis or {}, aeros or [], airp or [], mes)
+
+            # Default: una sola llamada
             data = self.api_client.make_request(endpoint, params if params else None)
             return generator_fn(data, mes)
                 
