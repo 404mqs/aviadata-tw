@@ -309,17 +309,45 @@ aviadata.ar
         if not data or len(data) == 0:
             return None
         
-        # Tomar las top 3 aerolíneas
-        top_3 = data[:3]
+        # Log de muestra para diagnóstico (primeros 3 elementos)
+        try:
+            logger.info(f"🔎 Muestra API aerolinea: {json.dumps(data[:3])}")
+        except Exception:
+            pass
+        
+        # Normalizar campos posibles y filtrar resultados con 0 vuelos
+        def parse_item(item: dict):
+            nombre = (
+                item.get("Aerolinea Nombre")
+                or item.get("aerolinea")
+                or item.get("nombre")
+                or item.get("Aerolinea")
+                or "Desconocida"
+            )
+            vuelos = (
+                item.get("total_vuelos")
+                or item.get("Cantidad")
+                or item.get("vuelos")
+                or 0
+            )
+            return nombre, vuelos
+
+        parsed = [parse_item(x) for x in data]
+        parsed = [(n, v) for (n, v) in parsed if isinstance(v, (int, float)) and v > 0]
+        
+        if not parsed:
+            logger.warning("⚠️ API aerolinea devolvió todos ceros o formato desconocido")
+            return None
+        
+        # Top 3 por cantidad
+        top_3 = sorted(parsed, key=lambda x: x[1], reverse=True)[:3]
         
         tweet = f"🏆 Top Aerolíneas {mes_formateado}\n¿Cuál es tu favorita?\n\n"
         
         emojis = ["🥇", "🥈", "🥉"]
-        for i, airline in enumerate(top_3):
-            nombre = airline.get("Aerolinea Nombre", "Desconocida")[:15]
-            vuelos = airline.get("total_vuelos", 0)
-            
-            tweet += f"{emojis[i]} {nombre}: {vuelos:,} vuelos\n"
+        for i, (nombre, vuelos) in enumerate(top_3):
+            nombre = str(nombre)[:20]
+            tweet += f"{emojis[i]} {nombre}: {int(vuelos):,} vuelos\n"
         
         tweet += f"\naviadata.ar\n#Aerolineas #{mes_formateado.replace(' ', '')}"
         
@@ -414,6 +442,39 @@ aviadata.ar
         
         tweet += f"\naviadata.ar\n#DestinosInternacionales #{mes_formateado.replace(' ', '')}"
         
+        return tweet[:280]
+
+    @staticmethod
+    def generar_rutas_transitadas(data: list, mes: str) -> Optional[str]:
+        """Generar tweet de rutas más transitadas usando endpoint /vuelos/rutas-enriquecidas"""
+        mes_formateado = TwitterContentGenerator.format_month_name(mes)
+        if not data or len(data) == 0:
+            return None
+        
+        # Log de muestra para diagnóstico
+        try:
+            logger.info(f"🔎 Muestra API rutas: {json.dumps(data[:3])}")
+        except Exception:
+            pass
+        
+        # Esperamos campos como Origen, Destino y total_vuelos/Cantidad
+        rutas = []
+        for item in data:
+            origen = item.get("Aeropuerto Origen Codigo") or item.get("origen") or item.get("Origen")
+            destino = item.get("Aeropuerto Destino Codigo") or item.get("destino") or item.get("Destino")
+            vuelos = item.get("total_vuelos") or item.get("Cantidad") or item.get("vuelos") or 0
+            if origen and destino and isinstance(vuelos, (int, float)) and vuelos > 0:
+                rutas.append((str(origen), str(destino), int(vuelos)))
+        
+        if not rutas:
+            return None
+        
+        top = sorted(rutas, key=lambda x: x[2], reverse=True)[:3]
+        tweet = f"🛣️ Rutas más transitadas {mes_formateado}\n\n"
+        medals = ["🥇", "🥈", "🥉"]
+        for i, (o, d, v) in enumerate(top):
+            tweet += f"{medals[i]} {o} → {d}: {v:,} vuelos\n"
+        tweet += f"\naviadata.ar\n#Rutas #{mes_formateado.replace(' ', '')}"
         return tweet[:280]
 
 # ================================
@@ -528,6 +589,11 @@ class TwitterBot:
                 data = self.api_client.make_request("/vuelos/aerolinea", 
                                                   {"months": months_filter, "all_periods": False, "limit": 10})
                 return self.content_generator.generar_top_aerolineas(data, mes)
+            
+            elif tipo_post == "rutas_transitadas":
+                data = self.api_client.make_request("/vuelos/rutas-enriquecidas", 
+                                                  {"months": months_filter, "all_periods": False, "limit": 25})
+                return self.content_generator.generar_rutas_transitadas(data, mes)
             
             elif tipo_post == "destinos_internacionales":
                 data = self.api_client.make_request("/vuelos/paises", 
