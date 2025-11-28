@@ -644,31 +644,35 @@ aviadata.ar
 
     @staticmethod
     def generar_rutas_internacionales(data: list, mes: str) -> Optional[str]:
-        """Top destinos internacionales por país usando /vuelos/paises"""
+        """Top rutas internacionales usando /vuelos/rutas"""
         mes_formateado = TwitterContentGenerator.format_month_name(mes)
         if not data:
             return None
         try:
-            logger.info(f"🔎 Muestra API paises: {json.dumps(data[:3])}")
+            logger.info(f"🔎 Muestra API rutas internacionales: {json.dumps(data[:3])}")
         except Exception:
             pass
 
-        # Intentar campos comunes
-        parsed = []
-        for x in data:
-            nombre = x.get("Pais Destino Nombre") or x.get("Pais Nombre") or x.get("pais") or "Desconocido"
-            cnt = x.get("total_vuelos") or x.get("Cantidad") or 0
-            if isinstance(cnt, (int, float)) and cnt > 0:
-                parsed.append((str(nombre)[:18], int(cnt)))
-        if not parsed:
+        rutas = []
+        for item in data:
+            ruta = item.get("Ruta") or item.get("ruta")
+            vuelos = item.get("Cantidad") or item.get("total_vuelos") or item.get("vuelos") or 0
+            if ruta and isinstance(vuelos, (int, float)) and vuelos > 0:
+                try:
+                    origen, destino = str(ruta).split("-")
+                except ValueError:
+                    origen, destino = str(ruta), ""
+                rutas.append((origen, destino, int(vuelos)))
+
+        if not rutas:
             return None
 
-        top = sorted(parsed, key=lambda x: x[1], reverse=True)[:3]
-        tweet = f"🌍 Destinos internacionales {mes_formateado}\n\n"
+        top = sorted(rutas, key=lambda x: x[2], reverse=True)[:3]
+        tweet = f"🌍 Rutas internacionales más transitadas {mes_formateado}\n\n"
         medals = ["🥇", "🥈", "🥉"]
-        for i, (n, c) in enumerate(top):
-            tweet += f"{medals[i]} {n}: {c:,} vuelos\n"
-        tweet += f"\naviadata.ar\n#Internacionales #{mes_formateado.replace(' ', '')}"
+        for i, (o, d, v) in enumerate(top):
+            tweet += f"{medals[i]} {o} → {d}: {v:,} vuelos\n"
+        tweet += f"\naviadata.ar\n#RutasInternacionales #{mes_formateado.replace(' ', '')}"
         return tweet[:280]
 
     @staticmethod
@@ -849,7 +853,7 @@ class TwitterBot:
                 "records_curiosidades": (None, None, {}),
                 "aerolineas_inusuales": (None, None, {}),
                 "comparativa_mensual": (None, None, {}),
-                "rutas_internacionales": ("/vuelos/paises", self.content_generator.generar_rutas_internacionales, {"months": months_filter, "all_periods": False, "tipo_pais": "destino", "flight_types": "Internacional"}),
+                "rutas_internacionales": ("/vuelos/rutas", self.content_generator.generar_rutas_internacionales, {"months": months_filter, "all_periods": False, "flight_types": "Internacional", "bidirectional": True, "limit": 25}),
                 "promedios_clase": ("/vuelos/clase", self.content_generator.generar_promedios_clase, {"months": months_filter, "all_periods": False}),
                 "recap_grafico": (None, None, {}),
             }
