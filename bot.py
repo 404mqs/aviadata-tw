@@ -67,7 +67,7 @@ class TwitterBotConfig:
         16: {"tipo": "records_curiosidades", "endpoint": "/vuelos/diario", "descripcion": "Día récords y curiosidades"},
         18: {"tipo": "aerolineas_inusuales", "endpoint": "/vuelos/detallados?es_inusual=true", "descripcion": "Aerolíneas inusuales"},
         20: {"tipo": "comparativa_mensual", "endpoint": "/vuelos/kpis", "descripcion": "Comparativa mensual con mes anterior"},
-        22: {"tipo": "rutas_internacionales", "endpoint": "/vuelos/paises?flight_types=Internacional", "descripcion": "Top rutas internacionales"},
+        22: {"tipo": "historial_vuelos_mes", "endpoint": "/vuelos/mes", "descripcion": "Historial de vuelos por mes"},
         24: {"tipo": "promedios_clase", "endpoint": "/vuelos/clase", "descripcion": "Promedios por clase de vuelo"},
         26: {"tipo": "recap_grafico", "endpoint": "multiple", "descripcion": "Recap gráfico mensual"}
     }
@@ -418,6 +418,33 @@ aviadata.ar
         
         tweet += "\n\naviadata.ar\n#Aviación #Estadísticas"
         
+        return tweet[:280]
+
+    @staticmethod
+    def generar_historial_vuelos_mes(data: list, mes: str) -> Optional[str]:
+        """Historial compacto de vuelos por mes usando /vuelos/mes"""
+        if not data or len(data) == 0:
+            return None
+        # Ordenar y tomar los últimos 8 meses para caber en 280
+        sorted_data = sorted(data, key=lambda x: x.get("Mes", ""))[-8:]
+        lines = []
+        for mes_data in sorted_data:
+            mes_raw = mes_data.get("Mes", "")
+            vuelos = mes_data.get("Cantidad", 0)
+            try:
+                año, mes_num = mes_raw.split('-')
+                meses_cortos = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+                mes_corto = meses_cortos[int(mes_num) - 1]
+                label = f"{mes_corto} {año[-2:]}"
+            except:
+                label = mes_raw
+            lines.append(f"{label}: {vuelos:,}")
+
+        tweet_head = "🗓️ Historial de vuelos por mes\n\n"
+        tweet_body = "\n".join(lines)
+        tweet_tail = "\n\naviadata.ar\n#Historial #Vuelos"
+        tweet = tweet_head + tweet_body + tweet_tail
         return tweet[:280]
     
     @staticmethod
@@ -853,7 +880,7 @@ class TwitterBot:
                 "records_curiosidades": (None, None, {}),
                 "aerolineas_inusuales": (None, None, {}),
                 "comparativa_mensual": (None, None, {}),
-                "rutas_internacionales": ("/vuelos/rutas", self.content_generator.generar_rutas_internacionales, {"months": months_filter, "all_periods": False, "flight_types": "Internacional", "bidirectional": True, "limit": 25}),
+                "historial_vuelos_mes": ("/vuelos/mes", self.content_generator.generar_historial_vuelos_mes, {}),
                 "promedios_clase": ("/vuelos/clase", self.content_generator.generar_promedios_clase, {"months": months_filter, "all_periods": False}),
                 "recap_grafico": (None, None, {}),
             }
